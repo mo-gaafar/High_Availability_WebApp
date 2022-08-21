@@ -10,7 +10,7 @@ This is a project for AWS Cloud DevOps Advanced Nanodegree by [EGFWD](https://ww
 
 ## Diagram
 
-![infra diagram](./diagrampreview.png)
+![infra diagram](./drawings/diagrampreview.png)
 
 [Visio Drawing Download](https://github.com/mo-gaafar/High_Availability_WebApp/blob/main/drawings/diagram.vsdx)
 
