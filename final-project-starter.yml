@@ -10,8 +10,6 @@ Parameters:
     Type: String
 
 Resources:
-  
-
   # instace profile contains the IAM Role name(s) that we want to associate to our auto scaling EC2 Servers
   # never give too much permissions to your EC2 instances! if they get hacked, the permissions get hacked also!
   # in this example, I create a Role called UdacityS3ReadOnlyC2 and just give it a policy of S3 Read-Only Access
@@ -21,15 +19,15 @@ Resources:
   S3AcessIAMRole:
     Type: AWS::IAM::Role
     Properties:
-      AssumeRolePolicyDocument: 
-          Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service:
-                  - ec2.amazonaws.com
-              Action:
-                - 'sts:AssumeRole'
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonS3FullAccess
 
@@ -45,7 +43,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allows http access to all instances
-      VpcId: 
+      VpcId:
         Fn::ImportValue: !Sub ${EnvironmentName}-VPCID
       SecurityGroupIngress:
         - CidrIp: 0.0.0.0/0
@@ -62,7 +60,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow htp access to and from LB
-      VpcId: 
+      VpcId:
         Fn::ImportValue: !Sub ${EnvironmentName}-VPCID
       SecurityGroupIngress:
         - CidrIp: 0.0.0.0/0
@@ -75,7 +73,6 @@ Resources:
           IpProtocol: tcp
           ToPort: 80
 
-
   # create a launch configuration that uses the above security group and instance profile
 
   LaunchConfig:
@@ -83,34 +80,22 @@ Resources:
     Properties:
       AssociatePublicIpAddress: false
       BlockDeviceMappings:
-      - DeviceName: "/dev/sdk"
-        Ebs:
-          VolumeSize: 10
+        - DeviceName: "/dev/sdk"
+          Ebs:
+            VolumeSize: 10
       IamInstanceProfile: !Ref S3AccessInstanceProfile
       ImageId: !Ref AMIid
       InstanceType: t2.medium
-      KeyName: newKeypair
       SecurityGroups:
         - !Ref WebServerSecurityGroup
       UserData:
-        Fn::Base64: !Sub
+        Fn::Base64: !Sub |
           #!/bin/bash
           apt-get update -y
-          apt-get install unzip awscli -y
           apt-get install apache2 -y
           systemctl start apache2.service
           cd /var/www/html
-          aws s3 cp s3://awsbucket12341/index.html .
-          echo "Udacity Demo Web Server Up and Running!" > index.html
-
-
-  TargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      Port: 80
-      Protocol: HTTP
-      VpcId: 
-        Fn::ImportValue: !Sub ${EnvironmentName}-VPCID
+          echo "<h1>it works! Udagram, Udacity</h1>" > index.html
 
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -118,10 +103,12 @@ Resources:
       VPCZoneIdentifier:
         - Fn::ImportValue: !Sub ${EnvironmentName}-PRIV-NETS
       LaunchConfigurationName: !Ref LaunchConfig
-      MaxSize: 4
-      MinSize: 4
+      MaxSize: "4"
+      MinSize: "4"
       TargetGroupARNs:
         - !Ref TargetGroup
+      HealthCheckGracePeriod: 60
+      HealthCheckType: ELB
 
   ElasticLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -154,12 +141,24 @@ Resources:
       ListenerArn: !Ref LoadBalancerListener
       Priority: 1
 
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 8
+      HealthyThresholdCount: 2
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 5
+      VpcId:
+        Fn::ImportValue: !Sub ${EnvironmentName}-VPCID
 
 Outputs:
-  
   LoadBalancerDNS:
     Description: DNS name of the load balancer
-    Value: !Join [ "", [ "http://", !GetAtt ElasticLoadBalancer.DNSName ] ]
+    Value: !Join ["", ["http://", !GetAtt ElasticLoadBalancer.DNSName]]
     Export:
       Name: !Sub ${EnvironmentName}-LB-DNS
 
